@@ -1,6 +1,6 @@
 {
   "name": "@quick-toolkit/rc-echarts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/cjs",
   "types": "dist/types",
   "description": "The rc-echarts uses echarts@5.2 developed a react component.",

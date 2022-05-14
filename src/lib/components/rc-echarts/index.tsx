@@ -24,70 +24,136 @@
 
 import React, {
   createRef,
-  forwardRef,
   HTMLProps,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
+  PureComponent,
+  ReactElement,
 } from 'react';
 
-import { ECharts, EChartsCoreOption, init, use as _use } from 'echarts/core';
+import { ElementEventName } from 'zrender/src/core/types';
+import { ECharts, EChartsCoreOption, init } from 'echarts/core';
 import { EChartsInitOpts } from '../../types';
-import { addEvent } from '../../event';
+import { Subscription } from '../../event';
+import { ECElementEvent } from 'echarts/types/src/util/types';
 
-export const RCEcharts = forwardRef<ECharts | undefined, RCEchartsProps>(
-  (props, ref) => {
-    const {
-      option,
-      theme,
-      config,
-      notMerge,
-      autoResize = true,
-      lazyUpdate,
-      ...restProps
-    } = props;
-    const instance = useRef<ECharts>();
+/**
+ * 图表组件
+ */
+export class RCEcharts extends PureComponent<RCEchartsProps, any> {
+  public instance: ECharts;
 
-    const element = createRef<HTMLDivElement>();
+  private ref = createRef<HTMLDivElement>();
 
-    // 创建ref
-    useImperativeHandle(ref, () => instance.current);
+  /**
+   * 添加事件监听
+   * @param evtName
+   * @param handler
+   */
+  public addEvent(
+    evtName: ElementEventName,
+    handler: (ev: ECElementEvent) => void
+  ): Subscription;
 
-    useEffect(() => {
-      instance.current = undefined;
-    }, [theme]);
+  /**
+   * 添加事件监听
+   * @param evtName
+   * @param query
+   * @param handler
+   */
+  public addEvent(
+    evtName: ElementEventName,
+    query: string | Object,
+    handler: (ev: ECElementEvent) => void
+  ): Subscription;
 
-    useEffect(() => {
-      if (element.current && !instance.current) {
-        instance.current = init(element.current, theme, config);
-      }
-    }, [config, element, theme]);
+  /**
+   * 实现
+   * @param args
+   */
+  public addEvent(...args: any[]): Subscription {
+    if (this.instance) {
+      this.instance.on(...(args as Parameters<ECharts['on']>));
+    }
 
-    useEffect(() => {
-      if (option && instance.current) {
-        option.backgroundColor = 'transparent';
-        instance.current.setOption(option, notMerge, lazyUpdate);
-      }
-    }, [option, notMerge, lazyUpdate]);
-
-    // 监听dom变化
-    useLayoutEffect(() => {
-      if (autoResize) {
-        const subscription = addEvent('resize', () => {
-          if (instance.current) {
-            instance.current.resize();
-          }
-        });
-        return (): void => subscription.remove();
-      }
-    }, [instance, autoResize]);
-
-    return <div key={theme as any} {...restProps} ref={element} />;
+    return {
+      remove: (): void => {
+        const find = args.find((x) => typeof x === 'function');
+        this.instance.off(args[0], find);
+      },
+    };
   }
-);
 
-export const use = _use;
+  /**
+   * componentDidMount
+   */
+  public componentDidMount(): void {
+    const { theme, config, option, notMerge, lazyUpdate } = this.props;
+    window.addEventListener('resize', this.handleResize);
+    if (this.ref.current) {
+      this.instance = init(this.ref.current, theme, config) as any;
+      if (option) {
+        option.backgroundColor = 'transparent';
+        this.instance.setOption(option, notMerge, lazyUpdate);
+      }
+    }
+  }
+
+  /***
+   * componentDidUpdate
+   * @param prevProps
+   * @param prevState
+   * @param snapshot
+   */
+  public componentDidUpdate(
+    prevProps: Readonly<RCEchartsProps>,
+    prevState: Readonly<any>,
+    snapshot?: any
+  ): void {
+    const { option, notMerge, lazyUpdate, theme, config } = this.props;
+    if (theme !== prevProps.theme && this.instance && this.ref.current) {
+      this.instance.dispose();
+      this.instance = init(this.ref.current, theme, config) as any;
+    }
+    if (
+      this.instance &&
+      option &&
+      (option !== prevProps.option ||
+        notMerge !== prevProps.notMerge ||
+        lazyUpdate !== prevProps.lazyUpdate)
+    ) {
+      option.backgroundColor = 'transparent';
+      this.instance.setOption(option, notMerge, lazyUpdate);
+    }
+  }
+
+  /**
+   * componentWillUnmount
+   */
+  public componentWillUnmount(): void {
+    if (this.instance) {
+      this.instance.dispose();
+    }
+    window.removeEventListener('resize', this.handleResize);
+  }
+
+  /**
+   * 渲染
+   */
+  public render(): ReactElement {
+    const { className, style } = this.props;
+    return <div className={className} style={style} ref={this.ref} />;
+  }
+
+  /**
+   * 监听重置
+   */
+  private handleResize = (): void => {
+    if (this.instance) {
+      this.instance.resize();
+    }
+  };
+}
+
+export * from 'echarts/core';
 
 export interface RCEchartsProps extends HTMLProps<HTMLDivElement> {
   option?: EChartsCoreOption;
