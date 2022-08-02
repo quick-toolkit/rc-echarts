@@ -22,93 +22,80 @@
  * SOFTWARE.
  */
 
-import React, {
-  createRef,
-  HTMLProps,
-  PureComponent,
-  ReactElement,
-} from 'react';
+import { createRef, CSSProperties, PureComponent } from 'react';
 
-import { ElementEventName } from 'zrender/src/core/types';
-import { ECharts, EChartsCoreOption, init } from 'echarts/core';
+import { EChartsCoreOption, init } from 'echarts/core';
 import { EChartsInitOpts } from '../../types';
+import { ECharts } from 'echarts';
 import { Subscription } from '../../event';
+import { ElementEventName } from 'zrender/src/core/types';
 import { ECElementEvent } from 'echarts/types/src/util/types';
 
 /**
- * 图表组件
+ * Component RCEcharts
  */
 export class RCEcharts extends PureComponent<RCEchartsProps, any> {
   public instance: ECharts;
 
   private ref = createRef<HTMLDivElement>();
 
-  /**
-   * 添加事件监听
-   * @param evtName
-   * @param handler
-   */
   public addEvent(
     evtName: ElementEventName,
     handler: (ev: ECElementEvent) => void
   ): Subscription;
 
-  /**
-   * 添加事件监听
-   * @param evtName
-   * @param query
-   * @param handler
-   */
   public addEvent(
     evtName: ElementEventName,
     query: string | Object,
     handler: (ev: ECElementEvent) => void
   ): Subscription;
 
-  /**
-   * 实现
-   * @param args
-   */
   public addEvent(...args: any[]): Subscription {
     if (this.instance) {
       this.instance.on(...(args as Parameters<ECharts['on']>));
     }
 
     return {
-      remove: (): void => {
+      remove: () => {
         const find = args.find((x) => typeof x === 'function');
         this.instance.off(args[0], find);
       },
     };
   }
 
-  /**
-   * componentDidMount
-   */
-  public componentDidMount(): void {
-    const { theme, config, option, notMerge, lazyUpdate } = this.props;
+  public componentDidMount() {
+    const {
+      theme,
+      config,
+      option,
+      notMerge = true,
+      lazyUpdate = true,
+    } = this.props;
     window.addEventListener('resize', this.handleResize);
     if (this.ref.current) {
       this.instance = init(this.ref.current, theme, config) as any;
       if (option) {
         option.backgroundColor = 'transparent';
-        this.instance.setOption(option, notMerge, lazyUpdate);
+        this.instance.setOption(option, {
+          notMerge,
+          lazyUpdate,
+        });
       }
     }
   }
 
-  /***
-   * componentDidUpdate
-   * @param prevProps
-   * @param prevState
-   * @param snapshot
-   */
   public componentDidUpdate(
     prevProps: Readonly<RCEchartsProps>,
     prevState: Readonly<any>,
     snapshot?: any
-  ): void {
-    const { option, notMerge, lazyUpdate, theme, config } = this.props;
+  ) {
+    const {
+      option,
+      notMerge = true,
+      lazyUpdate = true,
+      theme,
+      config,
+    } = this.props;
     if (theme !== prevProps.theme && this.instance && this.ref.current) {
       this.instance.dispose();
       this.instance = init(this.ref.current, theme, config) as any;
@@ -121,41 +108,36 @@ export class RCEcharts extends PureComponent<RCEchartsProps, any> {
         lazyUpdate !== prevProps.lazyUpdate)
     ) {
       option.backgroundColor = 'transparent';
-      this.instance.setOption(option, notMerge, lazyUpdate);
+      this.instance.resize();
+      this.instance.setOption(option, {
+        notMerge,
+        lazyUpdate,
+      });
     }
   }
 
-  /**
-   * componentWillUnmount
-   */
-  public componentWillUnmount(): void {
+  public componentWillUnmount() {
     if (this.instance) {
       this.instance.dispose();
     }
     window.removeEventListener('resize', this.handleResize);
   }
 
-  /**
-   * 渲染
-   */
-  public render(): ReactElement {
+  public render() {
     const { className, style } = this.props;
     return <div className={className} style={style} ref={this.ref} />;
   }
 
-  /**
-   * 监听重置
-   */
-  private handleResize = (): void => {
+  private handleResize = () => {
     if (this.instance) {
       this.instance.resize();
     }
   };
 }
 
-export * from 'echarts/core';
-
-export interface RCEchartsProps extends HTMLProps<HTMLDivElement> {
+export interface RCEchartsProps {
+  className?: string;
+  style?: CSSProperties;
   option?: EChartsCoreOption;
   theme?: string | object;
   config?: EChartsInitOpts;
@@ -163,3 +145,8 @@ export interface RCEchartsProps extends HTMLProps<HTMLDivElement> {
   lazyUpdate?: boolean;
   autoResize?: boolean;
 }
+
+export * from 'echarts/core';
+
+export * from '../../event';
+export * from '../../types';
